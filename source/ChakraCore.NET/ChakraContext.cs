@@ -19,7 +19,7 @@ namespace ChakraCore.NET
 
         internal JavaScriptContext jsContext;
         private EventWaitHandle syncHandle;
-        private CancellationTokenSource shutdownCTS = new CancellationTokenSource();
+        public CancellationTokenSource shutdownCTS = new CancellationTokenSource();
         private BlockingCollection<JavaScriptValue> promiseTaskQueue = new BlockingCollection<JavaScriptValue>();
         private JavaScriptPromiseContinuationCallback promiseContinuationCallback;
         private JavaScriptValue JSGlobalObject;
@@ -47,7 +47,7 @@ namespace ChakraCore.NET
             syncHandle = handle;
         }
 
-        internal void Init(bool enableDebug)
+        internal void Init(bool enableDebug, CancellationTokenSource cts = null)
         {
             isDebug = enableDebug;
             contextSwitch = new ContextSwitchService(jsContext, syncHandle);
@@ -67,7 +67,7 @@ namespace ChakraCore.NET
                 throw new InvalidOperationException("failed to setup callback for ES6 Promise");
             }
 
-            StartPromiseTaskLoop(shutdownCTS.Token);
+            StartPromiseTaskLoop(cts != null ? cts.Token : shutdownCTS.Token);
 
 
             JSGlobalObject = JavaScriptValue.GlobalObject;
@@ -89,6 +89,14 @@ namespace ChakraCore.NET
                 Console.WriteLine("Promise task loop started");
                 while (true)
                 {
+                    if (shutdownCTS.IsCancellationRequested)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkRed;
+                        Console.WriteLine("Breaking promise task loop");
+                        Console.ResetColor();
+                        break;
+                    }
+
                     JavaScriptValue task;
                     try
                     {
