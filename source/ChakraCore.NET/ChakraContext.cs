@@ -47,7 +47,7 @@ namespace ChakraCore.NET
             syncHandle = handle;
         }
 
-        internal void Init(bool enableDebug)
+        internal void Init(bool enableDebug, Action<int> taskAddedCallback = null, Action<int> taskTakenCallback = null)
         {
             isDebug = enableDebug;
             contextSwitch = new ContextSwitchService(jsContext, syncHandle);
@@ -56,6 +56,11 @@ namespace ChakraCore.NET
             Enter();
             promiseContinuationCallback = delegate (JavaScriptValue task, IntPtr callbackState)
             {
+                if (taskAddedCallback != null && taskTakenCallback != null)
+                {
+                    taskAddedCallback(1);
+                }
+
                 promiseTaskQueue.Add(task);
             };
 
@@ -63,7 +68,7 @@ namespace ChakraCore.NET
             {
                 throw new InvalidOperationException("failed to setup callback for ES6 Promise");
             }
-            StartPromiseTaskLoop(shutdownCTS.Token);
+            StartPromiseTaskLoop(shutdownCTS.Token, taskAddedCallback, taskTakenCallback);
 
 
 
@@ -79,11 +84,12 @@ namespace ChakraCore.NET
         }
 
 
-        private void StartPromiseTaskLoop(CancellationToken token)
+        private void StartPromiseTaskLoop(CancellationToken token, Action<int> taskAddedCallback = null, Action<int> taskTakenCallback = null)
         {
             Task.Factory.StartNew((Action)(() =>
             {
                 System.Diagnostics.Debug.WriteLine("Promise task loop started");
+                Console.WriteLine("Promise task loop started");
                 while (true)
                 {
                     JavaScriptValue task;
@@ -91,10 +97,12 @@ namespace ChakraCore.NET
                     {
                         task = promiseTaskQueue.Take(token);
                         System.Diagnostics.Debug.WriteLine("Promise task taken");
+                        Console.WriteLine("Promise task taken");
                     }
                     catch (OperationCanceledException)
                     {
                         System.Diagnostics.Debug.WriteLine("Promise task stop");
+                        Console.WriteLine("Promise task stop");
                         return;
                     }
                     catch (Exception)
@@ -106,6 +114,12 @@ namespace ChakraCore.NET
                     task.CallFunction((JavaScriptValue)this.JSGlobalObject);
                     Leave();
                     System.Diagnostics.Debug.WriteLine("Promise task complete");
+                    Console.WriteLine("Promise task complete");
+
+                    if (taskAddedCallback != null && taskTakenCallback != null)
+                    {
+                        taskTakenCallback(1);
+                    }
                 }
             })
                 , token
