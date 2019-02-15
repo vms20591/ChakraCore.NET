@@ -28,7 +28,7 @@ namespace ChakraCore.NET
         //private JavaScriptDiagStepType StepType = JavaScriptDiagStepType.JsDiagStepTypeContinue;
         TaskQueueRunner runner = new TaskQueueRunner();
         private AutoResetEvent stepASE = new AutoResetEvent(false);
-        
+
 
         public RuntimeDebuggingService(JavaScriptRuntime runtime)
         {
@@ -58,7 +58,7 @@ namespace ChakraCore.NET
                             OnException(this,JsonConvert.DeserializeObject<RuntimeException>(data));
                             stepASE.WaitOne();
                         });
-                        
+
                         break;
                     case JavaScriptDiagDebugEvent.JsDiagDebugEventStepComplete:
                         runner.With(() =>
@@ -66,7 +66,7 @@ namespace ChakraCore.NET
                             OnStepComplete(this,JsonConvert.DeserializeObject<BreakPoint>(data));
                             stepASE.WaitOne();
                         });
-                        
+
                         break;
                     case JavaScriptDiagDebugEvent.JsDiagDebugEventBreakpoint:
                         runner.With(() =>
@@ -74,7 +74,7 @@ namespace ChakraCore.NET
                             OnBreakPoint(this,JsonConvert.DeserializeObject<BreakPoint>(data));
                             stepASE.WaitOne();
                         });
-                        
+
                         break;
                     case JavaScriptDiagDebugEvent.JsDiagDebugEventAsyncBreak:
                         runner.With(() =>
@@ -82,7 +82,7 @@ namespace ChakraCore.NET
                             OnAsyncBreak(this,JsonConvert.DeserializeObject<BreakPoint>(data));
                             stepASE.WaitOne();
                         });
-                        
+
                         break;
                     default:
                         break;
@@ -135,7 +135,7 @@ namespace ChakraCore.NET
         public void NotifyScriptReady()
         {
             runner.With(() => { OnEngineReady?.Invoke(this, null); });
-            
+
         }
 
 
@@ -147,7 +147,7 @@ namespace ChakraCore.NET
                 Native.ThrowIfError(Native.JsDiagEvaluate(exp, stackFrameIndex, JavaScriptParseScriptAttributes.JsParseScriptAttributeNone, forceSetValueProp, out JavaScriptValue result), true);
                 return JsonConvert.DeserializeObject<Variable>(result.ToJsonString());
             });
-            
+
 
         }
 
@@ -159,7 +159,7 @@ namespace ChakraCore.NET
                 var json = result.ToJsonString();
                 return JsonConvert.DeserializeObject<BreakPoint[]>(json);
             });
-            
+
         }
 
         public Variable GetObjectFromHandle(uint objectHandle)
@@ -187,7 +187,7 @@ namespace ChakraCore.NET
                 Native.ThrowIfError(Native.JsDiagGetSource(scriptId, out JavaScriptValue source));
                 return JsonConvert.DeserializeObject<SourceCode>(source.ToJsonString());
             });
-            
+
         }
 
         public SourceCode[] GetScripts()
@@ -197,7 +197,7 @@ namespace ChakraCore.NET
                 Native.ThrowIfError(Native.JsDiagGetScripts(out JavaScriptValue result));
                 return JsonConvert.DeserializeObject<SourceCode[]>(result.ToJsonString());
             });
-            
+
 
 
         }
@@ -209,7 +209,7 @@ namespace ChakraCore.NET
                 Native.ThrowIfError(Native.JsDiagGetStackProperties(stackFrameIndex, out JavaScriptValue result));
                 return JsonConvert.DeserializeObject<StackProperties>(result.ToJsonString());
             });
-            
+
         }
 
         public StackTrace[] GetStackTrace()
@@ -219,7 +219,7 @@ namespace ChakraCore.NET
                 Native.ThrowIfError(Native.JsDiagGetStackTrace(out JavaScriptValue result));
                 return JsonConvert.DeserializeObject<StackTrace[]>(result.ToJsonString());
             });
-            
+
         }
 
         public void RemoveBreakpoint(uint breakpointId)
@@ -228,7 +228,7 @@ namespace ChakraCore.NET
             {
                 Native.ThrowIfError(Native.JsDiagRemoveBreakpoint(breakpointId));
             });
-            
+
         }
 
 
@@ -240,7 +240,7 @@ namespace ChakraCore.NET
                 string json = breakpoint.ToJsonString();
                 return JsonConvert.DeserializeObject<BreakPoint>(json);
             });
-            
+
         }
 
         public void SetBreakpointOnException(JavaScriptDiagBreakOnExceptionAttributes attributes)
@@ -252,7 +252,7 @@ namespace ChakraCore.NET
             stepASE.Set();
         }
 
-        
+
 
 
         public void RequestAsyncBreak()
@@ -324,8 +324,8 @@ namespace ChakraCore.NET
                 Task.Factory.StartNew(() =>
                 {
                     action();//run the action on new thread
-                    
-                    StopProcess(); 
+
+                    StopProcess();
                 });
                 StartProcess(taskQueue);//start process at current thread
             }

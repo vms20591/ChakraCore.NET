@@ -353,6 +353,20 @@
             return bufferSize;
         }
 
+        public static byte[] SerializeScript(string script)
+        {
+            ulong bufferSize = 0;
+            byte[] buffer = null;
+
+            Native.ThrowIfError(Native.JsSerializeScript(script, buffer, ref bufferSize));
+
+            buffer = new byte[bufferSize];
+
+            Native.ThrowIfError(Native.JsSerializeScript(script, buffer, ref bufferSize));
+
+            return buffer;
+        }
+
         /// <summary>
         ///     Returns the exception that caused the runtime of the current context to be in the 
         ///     exception state and resets the exception state for that runtime.

@@ -38,19 +38,39 @@ namespace ChakraCore.NET
             });
         }
 
+        public byte[] SerializeScript(string script)
+        {
+            return contextSwitch.With<byte[]>(() =>
+            {
+                return JavaScriptContext.SerializeScript(script);
+            });
+        }
+
         public string RunScript(string script)
         {
             var debugService = CurrentNode.GetService<IRuntimeDebuggingService>();
             return contextSwitch.With<string>(() =>
-              {
-                  var result= JavaScriptContext.RunScript(script,debugService.GetScriptContext("Script",script));
-                  return result.ConvertToString().ToString();
-              });
+            {
+                var result= JavaScriptContext.RunScript(script,debugService.GetScriptContext("Script",script));
+                return result.ConvertToString().ToString();
+            });
         }
 
-        public void RunModule(string script,Func<string,string> loadModuleCallback)
+        public string RunScript(string script, byte[] buffer)
         {
+            var debugService = CurrentNode.GetService<IRuntimeDebuggingService>();
+            return contextSwitch.With<string>(() =>
+            {
+                var result = JavaScriptContext.RunScript(script, buffer, debugService.GetScriptContext("Script", script));
+                return result.ConvertToString().ToString();
+            });
+        }
+
+        public void RunModule(string script, Func<string, string> loadModuleCallback)
+        {
+            Console.WriteLine("{0} ContextService.RunModule> Running module", DateTime.UtcNow.ToString("o"));
             moduleLoadException = null;
+            Console.WriteLine("{0} ContextService.RunModule> creating root record", DateTime.UtcNow.ToString("o"));
             JavaScriptModuleRecord rootRecord = contextSwitch.With(() =>
             {
                 return createModule(null, null, (name) =>
@@ -65,21 +85,50 @@ namespace ChakraCore.NET
                     }
                 });
             });
+            Console.WriteLine("{0} ContextService.RunModule> root record done", DateTime.UtcNow.ToString("o"));
             //startModuleParseQueue();
+            Console.WriteLine("{0} ContextService.RunModule> moduleReadyEvent waiting", DateTime.UtcNow.ToString("o"));
             moduleReadyEvent.WaitOne();
+            Console.WriteLine("{0} ContextService.RunModule> moduleReadyEvent set", DateTime.UtcNow.ToString("o"));
             throwIfExceptionInLoading();
             contextSwitch.With(() =>
             {
                 JavaScriptModuleRecord.RunModule(rootRecord);
             });
-
+            Console.WriteLine("{0} ContextService.RunModule> Module done", DateTime.UtcNow.ToString("o"));
         }
+        private static string ExtractErrorMessage(Exception exp)
+        {
+            var message = exp.Message;
+            if (exp is System.Runtime.InteropServices.COMException)
+            {
+                var cexp = exp as System.Runtime.InteropServices.COMException;
+                message = cexp.Message +
+                    "\r\nHResult: " + cexp.HResult.ToString() +
+                    "\r\nLink" + cexp.HelpLink;
 
+            }
+            return message;
+        }
+        private static string FormExceptionMessage(Exception exp)
+        {
+            var msg = "Error:" + ExtractErrorMessage(exp) + ":" + exp.StackTrace;
+            if (exp.InnerException != null)
+            {
+                msg += " Inner Exception:" + ExtractErrorMessage(exp.InnerException) + ":" + exp.InnerException.StackTrace;
+            }
+            return msg;
+        }
         private void throwIfExceptionInLoading()
         {
             var ex = moduleLoadException;
+
             if (ex != null)
             {
+                Console.BackgroundColor = ConsoleColor.Red;
+                Console.WriteLine("{0} ContextService.throwIfExceptionInLoading> {1}", DateTime.UtcNow.ToString("o"), FormExceptionMessage(ex));
+                Console.ResetColor();
+
                 moduleLoadException = null;
                 throw ex;
             }
@@ -117,7 +166,7 @@ namespace ChakraCore.NET
         private JavaScriptModuleRecord createModule(JavaScriptModuleRecord? parent, string name, Func<string, string> loadModuleCallback)
         {
             bool isCreateFromSourceCode = string.IsNullOrEmpty(name);
-            
+
             //if module is cached, return cached value
             if (!isCreateFromSourceCode && moduleCache.ContainsKey(name))
             {
@@ -130,7 +179,7 @@ namespace ChakraCore.NET
             FetchImportedModuleDelegate fetchImported = (JavaScriptModuleRecord reference, JavaScriptValue scriptName, out JavaScriptModuleRecord output) =>
             {
                 output= createModule(reference, scriptName.ToString(), loadModuleCallback);
-                
+
                 return JavaScriptErrorCode.NoError;
             };
 
@@ -142,6 +191,7 @@ namespace ChakraCore.NET
 
             NotifyModuleReadyCallbackDelegate notifyReady = (module, jsvalue) =>
             {
+                Console.WriteLine("{0} ContextService.notifyReady> setting moduleReadyEvent", DateTime.UtcNow.ToString("o"));
                 moduleReadyEvent.Set();
                 if (jsvalue.IsValid)
                 {
@@ -155,12 +205,12 @@ namespace ChakraCore.NET
 
 
             Action parseModule = () =>
-             {
-                 string script = loadModuleCallback(name);
-                 JavaScriptModuleRecord.ParseScript(result,script,debugService.GetScriptContext(name,script) );
-                 //debugService.AddScriptSource(name, script);
-                 System.Diagnostics.Debug.WriteLine($"module {name} Parsed");
-             };
+            {
+                string script = loadModuleCallback(name);
+                JavaScriptModuleRecord.ParseScript(result,script,debugService.GetScriptContext(name,script) );
+                //debugService.AddScriptSource(name, script);
+                System.Diagnostics.Debug.WriteLine($"module {name} Parsed");
+            };
 
             JavaScriptModuleRecord.SetFetchModuleCallback(result, fetchImported);
             JavaScriptModuleRecord.SetFetchModuleScriptCallback(result, fetchImportedFromScript);
@@ -173,20 +223,20 @@ namespace ChakraCore.NET
             {
                 JavaScriptModuleRecord.SetHostUrl(result, "<Generated_ModuleRoot>");
             }
-            
+
 
             moduleParseQueue.Add(new moduleItem(
                 parseModule,
                 fetchImported,
-                fetchImportedFromScript, 
+                fetchImportedFromScript,
                 notifyReady));
 
             if (!isCreateFromSourceCode)
             {
                 moduleCache.Add(name, result);//cache the module if it's not directly from RunModule function
             }
-            
-            
+
+
             System.Diagnostics.Debug.WriteLine($"{name} module created");
             return result;
         }

@@ -107,6 +107,10 @@ namespace ChakraCore.NET
                 }
                 disposedValue = true;
             }
+            
+            Console.ForegroundColor = ConsoleColor.DarkMagenta;
+            Console.WriteLine("{0} ChakraRuntime.Dispose: disposedValue {1}", DateTime.UtcNow.ToString("o"), disposedValue);
+            Console.ResetColor();
         }
 
 

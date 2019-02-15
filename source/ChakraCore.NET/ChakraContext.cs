@@ -58,8 +58,8 @@ namespace ChakraCore.NET
             {
                 promiseTaskQueue.Add(task);
 
-                System.Diagnostics.Debug.WriteLine("Promise task added");
-                Console.WriteLine("Promise task added");
+                System.Diagnostics.Debug.WriteLine("{0} Promise task added", DateTime.UtcNow.ToString("o"));
+                Console.WriteLine("{0} Promise task added", DateTime.UtcNow.ToString("o"));
             };
 
             if (Native.JsSetPromiseContinuationCallback(promiseContinuationCallback, IntPtr.Zero) != JavaScriptErrorCode.NoError)
@@ -85,14 +85,14 @@ namespace ChakraCore.NET
         {
             Task.Factory.StartNew((Action)(() =>
             {
-                System.Diagnostics.Debug.WriteLine("Promise task loop started");
-                Console.WriteLine("Promise task loop started");
+                System.Diagnostics.Debug.WriteLine("{0} Promise task loop started", DateTime.UtcNow.ToString("o"));
+                Console.WriteLine("{0} Promise task loop started", DateTime.UtcNow.ToString("o"));
                 while (true)
                 {
                     if (shutdownCTS.IsCancellationRequested)
                     {
                         Console.ForegroundColor = ConsoleColor.DarkRed;
-                        Console.WriteLine("Breaking promise task loop");
+                        Console.WriteLine("{0} Breaking promise task loop", DateTime.UtcNow.ToString("o"));
                         Console.ResetColor();
                         break;
                     }
@@ -101,8 +101,8 @@ namespace ChakraCore.NET
                     try
                     {
                         task = promiseTaskQueue.Take();
-                        System.Diagnostics.Debug.WriteLine("Promise task taken");
-                        Console.WriteLine("Promise task taken");
+                        System.Diagnostics.Debug.WriteLine("{0} Promise task taken", DateTime.UtcNow.ToString("o"));
+                        Console.WriteLine("{0} Promise task taken", DateTime.UtcNow.ToString("o"));
                     }
                     catch (OperationCanceledException)
                     {
@@ -131,8 +131,8 @@ namespace ChakraCore.NET
                         Leave();
                     }
 
-                    System.Diagnostics.Debug.WriteLine("Promise task complete");
-                    Console.WriteLine("Promise task complete");
+                    System.Diagnostics.Debug.WriteLine("{0} Promise task complete", DateTime.UtcNow.ToString("o"));
+                    Console.WriteLine("{0} Promise task complete", DateTime.UtcNow.ToString("o"));
                 }
             })
                 , token
@@ -171,6 +171,11 @@ namespace ChakraCore.NET
         public string RunScript(string script)
         {
             return ServiceNode.GetService<IContextService>().RunScript(script);
+        }
+
+        public string RunScript(string script, byte[] buffer)
+        {
+            return ServiceNode.GetService<IContextService>().RunScript(script, buffer);
         }
 
         /// <summary>
@@ -225,6 +230,11 @@ namespace ChakraCore.NET
             return ServiceNode.GetService<IContextService>().ParseScript(script);
         }
 
+        public byte[] SerializeScript(string script)
+        {
+            return ServiceNode.GetService<IContextService>().SerializeScript(script);
+        }
+
         #region IDisposable Support
         private bool disposedValue = false; // To detect redundant calls
 
@@ -241,6 +251,10 @@ namespace ChakraCore.NET
                 }
                 disposedValue = true;
             }
+
+            Console.ForegroundColor = ConsoleColor.DarkMagenta;
+            Console.WriteLine("{0} ChakraContext.Dispose: disposedValue {1}", DateTime.UtcNow.ToString("o"), disposedValue);
+            Console.ResetColor();
         }
 
         public void Dispose()
