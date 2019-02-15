@@ -34,13 +34,13 @@ namespace ChakraCore.NET
         /// </summary>
         /// <param name="enableDebug">Not used by now</param>
         /// <returns></returns>
-        public ChakraContext CreateContext(bool enableDebug, Action<int> taskAddedCallback = null, Action<int> taskTakenCallback = null)
+        public ChakraContext CreateContext(bool enableDebug)
         {
             try
             {
                 var c = runtime.CreateContext();
                 var result = new ChakraContext(c, this, SyncHandler);
-                result.Init(enableDebug, taskAddedCallback, taskTakenCallback);
+                result.Init(enableDebug);
                 return result;
                 
             }

@@ -1,6 +1,7 @@
 ﻿using ChakraCore.NET.API;
 using ChakraCore.NET.Promise;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ChakraCore.NET
@@ -8,8 +9,13 @@ namespace ChakraCore.NET
     public static class PromiseServiceInjector
     {
 
-        
+
         public static void RegisterTask(this IJSValueConverterService target)
+        {
+            target.RegisterTask(CancellationToken.None);
+        }
+
+        public static void RegisterTask(this IJSValueConverterService target, CancellationToken token)
         {
             if (target.CanConvert<Task>())
             {
@@ -28,10 +34,10 @@ namespace ChakraCore.NET
                     var globalObject = jsValueService.JSGlobalObject;
                     var converter = node.GetService<IJSValueConverterService>();
                     var tmp = node.WithContext(() =>
-                      {
-                          JavaScriptValue.CreatePromise(out var result, out var resolve, out var reject);
-                          return Tuple.Create(result, resolve, reject);
-                      });
+                    {
+                        JavaScriptValue.CreatePromise(out var result, out var resolve, out var reject);
+                        return Tuple.Create(result, resolve, reject);
+                    });
                     //start the task on new thread
                     Task.Factory.StartNew(async() =>
                     {
@@ -40,17 +46,17 @@ namespace ChakraCore.NET
                             await value;
                             jsValueService.CallFunction(tmp.Item2, globalObject);
                         }
-                        catch (PromiseRejectedException ex)
+                        catch (Exception exception)
                         {
-                            var message=converter.ToJSValue(ex.ToString());
-                            jsValueService.CallFunction(tmp.Item3, globalObject, message);
-                        }
-                        catch (Exception)
-                        {
+                            node.WithContext(() =>
+                            {
+                                var jsExp = JavaScriptValue.CreateError(JavaScriptValue.FromString(exception.Message));
+                                jsExp.SetProperty(JavaScriptPropertyId.FromString("stack"), JavaScriptValue.FromString(exception.StackTrace ?? Environment.StackTrace), true);
 
-                            throw;
+                                jsValueService.CallFunction(tmp.Item3, globalObject, jsExp);
+                            });
                         }
-                    });
+                    }, token);
                     //return the promise without wait task complete
                     return tmp.Item1;
                 },
@@ -73,6 +79,11 @@ namespace ChakraCore.NET
         }
 
         public static void RegisterTask<TResult>(this IJSValueConverterService target)
+        {
+            target.RegisterTask<TResult>(CancellationToken.None);
+        }
+
+        public static void RegisterTask<TResult>(this IJSValueConverterService target, CancellationToken token)
         {
             if (target.CanConvert<Task<TResult>>())
             {
@@ -105,32 +116,32 @@ namespace ChakraCore.NET
                             var r=await value;
                             jsValueService.CallFunction(tmp.Item2, globalObject, converter.ToJSValue(r));
                         }
-                        catch (PromiseRejectedException ex)
+                        catch (Exception exception)
                         {
-                            var message = converter.ToJSValue(ex.ToString());
-                            jsValueService.CallFunction(tmp.Item3, globalObject, message);
-                        }
-                        catch (Exception ex)
-                        {
+                            node.WithContext(() =>
+                            {
+                                var jsExp = JavaScriptValue.CreateError(JavaScriptValue.FromString(exception.Message));
+                                jsExp.SetProperty(JavaScriptPropertyId.FromString("stack"), JavaScriptValue.FromString(exception.StackTrace ?? Environment.StackTrace), true);
 
-                            throw new InvalidOperationException("Promise call failed", ex);
+                                jsValueService.CallFunction(tmp.Item3, globalObject, jsExp);
+                            });
                         }
-                    });
+                    }, token);
 
                     //return the promise without wait task complete
                     return tmp.Item1;
                 },
                 (node, value) =>
                 {
-            //from a promise 
-            return Task.Factory.FromAsync(
+                    //from a promise 
+                    return Task.Factory.FromAsync(
 
-        (callback, state) =>
-        {
-                            return BeginMethod<TResult>(value, node, callback, state);
-                        }
-        , EndMethod<TResult>, null
-        );
+                (callback, state) =>
+                {
+                    return BeginMethod<TResult>(value, node, callback, state);
+                }
+                , EndMethod<TResult>, null
+                );
 
 
                 }, false
@@ -196,7 +207,7 @@ namespace ChakraCore.NET
 
                     result.SetError(ex.Message);
                 }
-                
+
                 if (s.ValueType==JavaScriptValueType.String)
                 {
                     result.SetError(s.ToString());
